@@ -162,6 +162,16 @@ def handle_file(update, context):
 def handle_button_click(update, context):
     return handle('button_click', update, context)
 
+async def send_message(bot, chat_id, text, reply_to_message_id=None, reply_markup=None):
+    max_length = 4096
+    for i in range(0, len(text), max_length):
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text[i:i+max_length],
+            reply_to_message_id=reply_to_message_id if i == 0 else None,
+            reply_markup=reply_markup if i == 0 else None
+        )
+
 async def handle(command, update, context):
     chat_id = update.effective_chat.id
     print("chat_id=", chat_id)
@@ -190,7 +200,7 @@ async def handle(command, update, context):
 
             await context.bot.send_chat_action(chat_id=chat_id, action="TYPING")
             summary = summarize(text_array)
-            await context.bot.send_message(chat_id=chat_id, text=f"{summary}", reply_to_message_id=update.message.message_id, reply_markup=get_inline_keyboard_buttons())
+            await send_message(context.bot, chat_id, summary, reply_to_message_id=update.message.message_id, reply_markup=get_inline_keyboard_buttons())
         elif command == 'file':
             file_path = f"{update.message.document.file_unique_id}.pdf"
             print("file_path=", file_path)
@@ -207,7 +217,7 @@ async def handle(command, update, context):
 
             await context.bot.send_chat_action(chat_id=chat_id, action="TYPING")
             summary = summarize(text_array)
-            await context.bot.send_message(chat_id=chat_id, text=f"{summary}", reply_to_message_id=update.message.message_id, reply_markup=get_inline_keyboard_buttons())
+            await send_message(context.bot, chat_id, summary, reply_to_message_id=update.message.message_id, reply_markup=get_inline_keyboard_buttons())
 
             # remove temp file after sending message
             os.remove(file_path)
@@ -228,13 +238,13 @@ async def handle(command, update, context):
                 for r in results[0]:
                     links += f"{r['title']}\n{r['href']}\n"
 
-                await context.bot.send_message(chat_id=chat_id, text=links, reply_to_message_id=update.callback_query.message.message_id, disable_web_page_preview=True)
+                send_long_message(context.bot, chat_id, links, reply_to_message_id=update.callback_query.message.message_id)
 
             if update.callback_query.data == "why_it_matters":
                 result = call_gpt_api(f"{original_message_text}\nBased on the content above, tell me why it matters as an expert.", [
                     {"role": "system", "content": f"You will show the result in {lang}."}
                 ])
-                await context.bot.send_message(chat_id=chat_id, text=result, reply_to_message_id=update.callback_query.message.message_id)
+                send_long_message(context.bot, chat_id, result, reply_to_message_id=update.callback_query.message.message_id)
     except Exception as e:
         print(f"Error: {e}")
         await context.bot.send_message(chat_id=chat_id, text=str(e))
